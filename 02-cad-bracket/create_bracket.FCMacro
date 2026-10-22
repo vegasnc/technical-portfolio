@@ -1,0 +1,64 @@
+import FreeCAD as App
+import Part
+import Sketcher
+import os
+
+doc = App.newDocument("ParametricMountingBracket")
+out_dir = os.path.dirname(os.path.abspath(__file__))
+
+base_length = 80.0
+base_width = 40.0
+plate_thickness = 6.0
+upright_height = 50.0
+hole_diameter = 8.0
+hole_offset_x = 15.0
+hole_offset_y = 12.0
+
+base = doc.addObject("PartDesign::Body", "BaseBody")
+base.Label = "Base plate"
+sk1 = doc.addObject("Sketcher::SketchObject", "BaseSketch")
+base.addObject(sk1)
+sk1.Label = "Base outline and holes"
+pts = [App.Vector(-base_length/2, -base_width/2, 0),
+       App.Vector(base_length/2, -base_width/2, 0),
+       App.Vector(base_length/2, base_width/2, 0),
+       App.Vector(-base_length/2, base_width/2, 0)]
+for i in range(4):
+    sk1.addGeometry(Part.LineSegment(pts[i], pts[(i+1)%4]), False)
+for x in (-base_length/2 + hole_offset_x, base_length/2 - hole_offset_x):
+    sk1.addGeometry(Part.Circle(App.Vector(x, 0, 0), App.Vector(0,0,1), hole_diameter/2), False)
+pad = base.newObject("PartDesign::Pad", "BasePad")
+pad.Label = "Base plate thickness"
+pad.Profile = sk1
+pad.Length = plate_thickness
+sk1.Visibility = False
+doc.recompute()
+
+upright = doc.addObject("PartDesign::Body", "UprightBody")
+upright.Label = "Upright plate"
+sk2 = doc.addObject("Sketcher::SketchObject", "UprightSketch")
+upright.addObject(sk2)
+sk2.Label = "Upright outline"
+x1, x2 = -base_length/2, base_length/2
+y1, y2 = base_width/2 - plate_thickness, base_width/2
+z0 = 0
+p2 = [App.Vector(x1,y1,z0), App.Vector(x2,y1,z0),
+      App.Vector(x2,y2,z0), App.Vector(x1,y2,z0)]
+for i in range(4):
+    sk2.addGeometry(Part.LineSegment(p2[i], p2[(i+1)%4]), False)
+pad2 = upright.newObject("PartDesign::Pad", "UprightPad")
+pad2.Label = "Upright plate height"
+pad2.Profile = sk2
+pad2.Length = upright_height
+sk2.Visibility = False
+doc.recompute()
+
+doc.recompute()
+Gui.activeDocument().activeView().viewAxonometric()
+Gui.activeDocument().activeView().fitAll()
+doc.saveAs(os.path.join(out_dir, "parametric_mounting_bracket.FCStd"))
+try:
+    Part.export([pad, pad2], os.path.join(out_dir, "parametric_mounting_bracket.step"))
+except Exception as e:
+    App.Console.PrintWarning("STEP export skipped: " + str(e) + "\n")
+App.Console.PrintMessage("Bracket created. Review hole placement and plate intersection before use.\n")
